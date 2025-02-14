@@ -25,7 +25,7 @@ function Payment() {
 
   const handleChange = (e) => {
     setCardError(e?.error?.message || "");
-  };
+   };
 
   const handlePayment = async (e) => {
     e.preventDefault();
@@ -35,35 +35,18 @@ function Payment() {
     try {
       setProcessing(true);
 
+      // Fetch client secret from the backend
       const response = await axiosInstance.post(`/payment/create?total=${total * 100}`);
       const clientSecret = response.data?.clientSecret;
 
-      if (!clientSecret) {
-        console.error("Client Secret not received from the backend.");
-        setProcessing(false);
-        return;
-      }
-
-      const paymentResult = await stripe.confirmCardPayment(clientSecret, {
+      // Confirm card payment
+      const { paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
         payment_method: {
           card: elements.getElement(CardElement),
         },
       });
 
-      if (!paymentResult || !paymentResult.paymentIntent) {
-        console.error("Payment Intent is undefined:", paymentResult);
-        setProcessing(false);
-        return;
-      }
-
-      const { paymentIntent } = paymentResult;
-
-      if (!user?.uid) {
-        console.error("User is not logged in or UID is missing.");
-        setProcessing(false);
-        return;
-      }
-
+      // Save order details in Firestore
       await db
         .collection("users")
         .doc(user?.uid)
@@ -75,20 +58,23 @@ function Payment() {
           created: paymentIntent.created,
         });
 
+      // Clear the basket
       dispatch({ type: Type.EMPTY_BASKET });
 
       setProcessing(false);
       navigate("/orders", { state: { msg: "Order Placed Successfully" } });
     } catch (err) {
-      console.error("Payment Error:", err);
+      console.error(err);
       setProcessing(false);
     }
   };
 
   return (
+    
     <LayOut>
       <div className={classes.payment_header}>Checkout ({totalItem}) items</div>
       <section className={classes.payment}>
+        {/* Delivery Address */}
         <div className={classes.flex}>
           <h3>Delivery Address</h3>
           <div>
@@ -98,31 +84,35 @@ function Payment() {
           </div>
         </div>
         <hr />
-        <div className={classes.flex}>
-          <h3>Review Items and Delivery</h3>
-          <div>
-            {(basket || []).map((item, index) => (
+
+        {/* Review Items */}
+         <div className={classes.flex}>
+           <h3>Review Items and Delivery</h3>
+           <div>
+             {(basket || []).map((item, index) => (
               <ProductCard key={index} product={item} flex={true} />
             ))}
           </div>
         </div>
         <hr />
-        <div className={classes.flex}>
-          <h3>Payment Methods</h3>
+
+        {/* Payment Method */}
+         <div className={classes.flex}>
+           <h3>Payment Methods</h3>
           <div className={classes.payment__card__container}>
-            <div className={classes.payment__details}>
-              <form onSubmit={handlePayment}>
-                {cardError && <small style={{ color: "red" }}>{cardError}</small>}
-                <CardElement onChange={handleChange} />
-                <div className={classes.payment__price}>
-                  <div>
-                    <span style={{ display: "flex", gap: "10px" }}>
-                      <p>Total Order |</p>
-                      <CurrencyFormat amount={total} />
-                    </span>
-                  </div>
-                  <button type="submit" disabled={processing || !stripe || !elements}>
-                    {processing ? (
+             <div className={classes.payment__details}>
+               <form onSubmit={handlePayment}>
+                 {cardError && <small style={{ color: "red" }}>{cardError}</small>}
+                 <CardElement onChange={handleChange} />
+                 <div className={classes.payment__price}>
+                   <div>
+                     <span style={{ display: "flex", gap: "10px" }}>
+                       <p>Total Order |</p>
+                       <CurrencyFormat amount={total} />
+                     </span>
+                   </div>
+                   <button type="submit" disabled={processing || !stripe || !elements}>
+                     {processing ? (
                       <div className={classes.loading}>
                         <ClipLoader color="gray" size={12} />
                         <p>Please wait ...</p>
@@ -139,6 +129,7 @@ function Payment() {
       </section>
     </LayOut>
   );
-}
+ }
 
-export default Payment;
+ export default Payment;
+
